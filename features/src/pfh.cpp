@@ -41,6 +41,7 @@
 #include <pcl/features/impl/pfhrgb.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////////////////
+
 bool
 pcl::computePairFeatures (const Eigen::Vector4f &p1, const Eigen::Vector4f &n1, 
                           const Eigen::Vector4f &p2, const Eigen::Vector4f &n2,
@@ -73,8 +74,54 @@ pcl::computePairFeatures (const Eigen::Vector4f &p1, const Eigen::Vector4f &n1,
     dp2p1 *= (-1);
     f3 = -angle2;
   }
+  else if ( angle1 == angle2 )
+  {
+    if ( angle1 == 0 )
+    {
+      // both angles are NULL, no need to flip in any of both orders
+      f3 = angle1;
+    }
+    else
+    {
+#if !( NDEBUG )
+       Eigen::Vector4f dp1p2 = p1 - p2;
+       dp1p2[3] = 0.0f;
+ 
+       assert( f4 == dp1p2.norm () );
+       
+       float angle1_2 = n1_copy.dot (dp1p2) / f4;
+ 
+       // Make sure the same point is selected as 1 and 2 for each pair
+       float angle2_2 = n2_copy.dot (dp1p2) / f4;
+       
+       // angles are the both same, but depending on the order of p1 and p2 the sign will change
+       assert( angle1_2 == angle2_2 );
+       assert( angle1_2 == -1 * angle1 );
+       
+       PCL_DEBUG ("[pcl::computePairFeatures] angle2 and angle1 are equal but sign depends on order!\n");
+#endif // !( NDEBUG )
+      
+      if ( angle1 > 0 )
+      {
+	// flip
+	// switch p1 and p2
+	n1_copy = n2;
+	n2_copy = n1;
+	n1_copy[3] = n2_copy[3] = 0.0f;
+	dp2p1 *= (-1);
+	f3 = -angle2;
+      }
+      else
+      {
+	// no flip
+	f3 = angle1;
+      }
+    }
+  }
   else
+  {
     f3 = angle1;
+  }
 
   // Create a Darboux frame coordinate system u-v-w
   // u = n1; v = (p_idx - q_idx) x u / || (p_idx - q_idx) x u ||; w = u x v
@@ -103,6 +150,7 @@ pcl::computePairFeatures (const Eigen::Vector4f &p1, const Eigen::Vector4f &n1,
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
+
 bool
 pcl::computeRGBPairFeatures (const Eigen::Vector4f &p1, const Eigen::Vector4f &n1, const Eigen::Vector4i &colors1,
                              const Eigen::Vector4f &p2, const Eigen::Vector4f &n2, const Eigen::Vector4i &colors2,

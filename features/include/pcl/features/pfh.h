@@ -45,6 +45,10 @@
 #include <pcl/features/feature.h>
 #include <pcl/features/pfh_tools.h>
 #include <map>
+#include <unordered_map>
+
+#include <cmath>
+#include <assert.h>
 
 namespace pcl
 {
@@ -78,7 +82,7 @@ namespace pcl
     * \author Radu B. Rusu
     * \ingroup features
     */
-  template <typename PointInT, typename PointNT, typename PointOutT = pcl::PFHSignature125>
+  template <typename PointInT, typename PointNT, typename PointOutT = pcl::PFHSignature125, bool T_optimize_for_organized = false>
   class PFHEstimation : public FeatureFromNormals<PointInT, PointNT, PointOutT>
   {
     public:
@@ -208,10 +212,16 @@ namespace pcl
       float d_pi_; 
 
       /** \brief Internal hashmap, used to optimize efficiency of redundant computations. */
-      std::map<std::pair<int, int>, Eigen::Vector4f, std::less<std::pair<int, int> >, Eigen::aligned_allocator<Eigen::Vector4f> > feature_map_;
-
+      std::unordered_map< 
+		  uint64_t, 
+		  Eigen::Vector4f, 
+		  std::hash< uint64_t >, 
+		  std::equal_to< uint64_t >, 
+		  Eigen::aligned_allocator<Eigen::Vector4f> 
+		  > feature_map_;
+      
       /** \brief Queue of pairs saved, used to constrain memory usage. */
-      std::queue<std::pair<int, int> > key_list_;
+      std::queue<uint64_t> key_list_;
 
       /** \brief Maximum size of internal cache memory. */
       unsigned int max_cache_size_;
