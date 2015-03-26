@@ -228,7 +228,7 @@ pcl::PFHEstimation<PointInT, PointNT, PointOutT, T_optimize_for_organized>::comp
   if ( T_optimize_for_organized && ( !input_->isOrganized() || !normals_->isOrganized() ) )
   {
        // invalid
-    PCL_ERROR ("[pcl::PFHEstimation::computeFeature] Passed not organized cloud to estimator that 
+    PCL_ERROR ("[pcl::PFHEstimation::computeFeature] Passed not organized cloud to estimator that" 
 	       "is optimized for and only usable with organized clouds!\n") ;
     return;
   }
