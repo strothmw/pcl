@@ -44,8 +44,13 @@
 #include <pcl/features/fpfh.h>
 #include <pcl/features/pfh_tools.h>
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 template< typename T_PointType >
-int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood( int ao_idx, NeighborhoodConstPtr& ap_neighborhood  ) const 
+int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood
+				    ( 
+					int ao_idx, NeighborhoodConstPtr& ap_neighborhood  
+				    ) const 
 {
   NeighborhoodPtr lp_neihborhood = pv_buffered_neighborhood[ ao_idx ];
   
@@ -64,24 +69,27 @@ int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood( int ao_idx, N
   
 }
 
-template< typename T_PointType >
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+template< typename T_PointType  >
 template< typename T_NormalsType >
-void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, const pcl::PointCloud<T_NormalsType>& ar_normals, double ao_search_param  )
+void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer
+		    ( 
+			const pcl::PointCloud<T_PointType>& ar_cloud, 
+			const pcl::PointCloud<T_NormalsType>& ar_normals, 
+			double ao_search_param  
+		    )
 {
   size_t lo_cloud_sz = ar_cloud.width * ar_cloud.height;
   
-  ROS_ASSERT( ar_cloud.width == ar_normals.width );
-  ROS_ASSERT( ar_cloud.height == ar_normals.height );
+  assert( ar_cloud.width == ar_normals.width );
+  assert( ar_cloud.height == ar_normals.height );
   
   typename pcl::PointCloud<T_PointType>::Ptr lp_cloud_clone;
-  EVAL_PERFORMANCE_NO_SUP (
-	{
-	  lp_cloud_clone = ar_cloud.makeShared(); // clone into the could
-	}
-    );
   
+  lp_cloud_clone = ar_cloud.makeShared(); // clone into the could
+
   
-  EVAL_PERFORMANCE_NO_SUP (
   {
     // set all points of the cloud clone invalid where the normals are invalid
     // such that no index with invalid normal will be returned in the neighborhood search
@@ -93,17 +101,14 @@ void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer( const pcl::PointC
 	
 	if ( ! pcl::isFinite( lr_pt ) )
 	{
-	  lr_pt.x = nanf("");
-	  lr_pt.y = nanf("");
-	  lr_pt.z = nanf("");
+	  lr_pt.x = std::numeric_limits<float>::quiet_NaN();
+	  lr_pt.y = std::numeric_limits<float>::quiet_NaN();
+	  lr_pt.z = std::numeric_limits<float>::quiet_NaN();
 	}
       }
     }
   }
-	);
-  
-  EVAL_PERFORMANCE_NO_SUP(
-      {
+
   pv_buffered_neighborhood.resize( lo_cloud_sz );
   
   for (size_t lo_idx = 0; lo_idx < lo_cloud_sz; lo_idx++ )
@@ -114,7 +119,7 @@ void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer( const pcl::PointC
       continue;
     }
     
-    boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood( new pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t() );
+    NeighborhoodPtr lp_neihborhood( new Neighborhood_t() );
     
     po_search_function( ar_cloud, lo_idx, ao_search_param, lp_neihborhood->sv_nn_indices, lp_neihborhood->sv_nn_dists );
     
@@ -124,70 +129,7 @@ void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer( const pcl::PointC
     }
     // else, no neighbors found, drop this neighborhood obj
   }
-  
-      });
 }
-
-// template< typename T_PointType >
-// template< typename T_CheckPointType/*, typename T_is_valid_check_function*/ >
-// void pcl::NeighborhoodSearchBuffer< T_PointType >::removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud  )
-// {
-//   size_t lo_cloud_sz = ar_cloud.width * ar_cloud.height;
-//   
-//   assert( lo_cloud_sz == pv_buffered_neighborhood.size() );
-//   
-//   for (size_t lo_idx = 0; lo_idx < lo_cloud_sz; lo_idx++ )
-//   {
-//     boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood = pv_buffered_neighborhood[ lo_idx ];
-//     
-//     if ( ! lp_neihborhood )
-//     {
-//       // neighborhood is yet completely invalid, nothing to be done here
-//       continue;
-//     }
-//     
-//     if ( ! pcl::isFinite( ar_cloud.at( lo_idx ) ) )
-//     {
-//       // point invalid
-//       // remove neighborhood completely
-//       pv_buffered_neighborhood[ lo_idx ].reset();
-//       continue;
-//     }
-//     
-//     // check neighborhood does not contain indices of invalid pixels
-//     std::list<int> ll_nn_indices( lp_neihborhood->sv_nn_indices.begin(),  lp_neihborhood->sv_nn_indices.end() );
-//     std::list<float> ll_nn_dists( lp_neihborhood->sv_nn_dists.begin(),  lp_neihborhood->sv_nn_dists.end() );
-//     
-//     std::list<int>::iterator lo_indices_iter( ll_nn_indices.begin() ), lo_indices_iter_end( ll_nn_indices.end() );
-//     std::list<float>::iterator lo_dists_iter( ll_nn_dists.begin() ), lo_dists_iter_end( ll_nn_dists.end() );
-//     
-//     bool lo_changed = false;
-//     
-//     while ( lo_dists_iter != lo_dists_iter_end && lo_indices_iter != lo_indices_iter_end )
-//     {
-//       if ( ! pcl::isFinite( ar_cloud.at( *lo_indices_iter ) ) )
-//       {
-// 	// invalid index, remove
-// 	lo_indices_iter = ll_nn_indices.erase( lo_indices_iter );
-// 	lo_dists_iter = ll_nn_dists.erase( lo_dists_iter );
-// 	lo_changed = true;
-//       }
-//       else
-//       {
-// 	++lo_dists_iter;
-// 	++lo_indices_iter;
-//       }
-//     }
-//     
-//     if ( lo_changed )
-//     {
-//       lp_neihborhood->sv_nn_indices = std::vector<int>( ll_nn_indices.begin(), ll_nn_indices.end() );
-//       lp_neihborhood->sv_nn_dists = std::vector<float>( ll_nn_dists.begin(), ll_nn_dists.end() );
-//     }
-//   }
-// }
-// 
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointInT, typename PointNT, typename PointOutT> bool
@@ -320,7 +262,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
     Eigen::MatrixXf &hist_f1, Eigen::MatrixXf &hist_f2, Eigen::MatrixXf &hist_f3)
 {
   // use pointers to avoid having to copy the vectors each time calling into getNeighborhood
-  typename pcl::NeighborhoodSearchBuffer<PointInT>::NeighborhoodConstPtr lp_neihborhood;
+  NeighborhoodConstPtr lp_neihborhood;
   
   std::set<int> spfh_indices;
   spfh_hist_lookup.resize (surface_->points.size ());
@@ -376,30 +318,18 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
 template <typename PointInT, typename PointNT, typename PointOutT> void
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut &output)
 {
-  ROS_INFO( "Conputing neighborhoods" );
-  
-  EVAL_PERFORMANCE_NO_SUP
-  (
   po_search_buffer.fillBuffer( *input_, *normals_, search_parameter_ );
-  );
-  
-  ROS_INFO( "Tidy up neighborhoods" );
-    
-  ROS_INFO( "In pcl stuff" );
   
   std::vector<int> spfh_hist_lookup;
   
-  EVAL_PERFORMANCE_NO_SUP(
-      {
   computeSPFHSignatures (spfh_hist_lookup, hist_f1_, hist_f2_, hist_f3_);
-      });
       
   output.is_dense = true;
       
-  EVAL_PERFORMANCE_NO_SUP(
-      {
-	
-  typename pcl::NeighborhoodSearchBuffer<PointInT>::NeighborhoodConstPtr lp_neihborhood;
+  NeighborhoodConstPtr lp_neihborhood;
+  
+  ///  no need to distignish between dense and non dense clouds because the search buffer returns 
+  // 		only valid and for valid indices
   
   // Iterate over the entire index vector
   for (size_t idx = 0; idx < indices_->size (); ++idx)
@@ -434,8 +364,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
       output.points[idx].histogram[d] = fpfh_histogram_[d];
     }
   }
-      });
-
+  
   po_search_buffer.clear();
 }
 

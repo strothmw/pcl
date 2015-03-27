@@ -46,11 +46,12 @@
 
 #include <boost/shared_ptr.hpp>
 #include <cmath>
+#include <math.h>
 #include <list>
 
 
 namespace pcl
-{
+{  
   template< typename T_PointType >
   class NeighborhoodSearchBuffer
   {
@@ -72,21 +73,11 @@ namespace pcl
     
   public:
     
-    static inline bool fastIsValid( const T_PointType& ar_pt )
-    {
-      return std::isfinite( ar_pt.x );
-    }
-    
-    static inline bool fastIsValid( const pcl::Normal& ar_pt )
-    {
-      return std::isfinite( ar_pt.normal_x );  
-    }
-    
     NeighborhoodSearchBuffer()
     {
       // nothing to be done here
     }
-    
+
     virtual ~NeighborhoodSearchBuffer()
     {
       // nothing to be done here
@@ -99,24 +90,9 @@ namespace pcl
     }
     
     int getNeighborhood( int ao_idx, NeighborhoodConstPtr& ap_neighborhood ) const ; 
-    /*
-    template< typename T_is_valid_check_function >
-    void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, double ao_search_param );*/
     
     template< typename T_NormalsType >
-    void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, const pcl::PointCloud<T_NormalsType>& ar_normals, double ao_search_param  );/*
-    {
-      fillBuffer< pcl::isFinite<T_PointType> >( ar_cloud, ao_search_param );
-    }*/
-    /*
-    template< typename T_CheckPointType, typename T_is_valid_check_function  >
-    void removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud );
-    *//*
-    template< typename T_CheckPointType >
-    void removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud );*//*
-    {
-      fillBuffer< T_CheckPointType,  pcl::isFinite<T_CheckPointType> >( ar_cloud  );
-    }*/
+    void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, const pcl::PointCloud<T_NormalsType>& ar_normals, double ao_search_param  );
     
     void clear()
     {
@@ -124,9 +100,7 @@ namespace pcl
     }
 
   };
-  
-  
-  
+    
   
   /** \brief FPFHEstimation estimates the <b>Fast Point Feature Histogram (FPFH)</b> descriptor for a given point 
     * cloud dataset containing points and normals.
@@ -175,7 +149,12 @@ namespace pcl
 
       typedef typename Feature<PointInT, PointOutT>::PointCloudOut PointCloudOut;
 
-      NeighborhoodSearchBuffer<PointInT> po_search_buffer;
+      typedef NeighborhoodSearchBuffer<PointInT> NeighborhoodBufferType;
+      
+      typedef typename NeighborhoodBufferType::NeighborhoodPtr NeighborhoodPtr;
+      typedef typename NeighborhoodBufferType::NeighborhoodConstPtr NeighborhoodConstPtr;
+      
+      NeighborhoodBufferType po_search_buffer;
       
       /** \brief Empty constructor. */
       FPFHEstimation () : 
