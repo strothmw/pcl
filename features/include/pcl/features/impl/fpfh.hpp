@@ -239,8 +239,11 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
   std::vector<float> nn_dists (k_);
 
   std::vector<int> spfh_hist_lookup;
+  EVAL_PERFORMANCE_NO_SUP
+    (
   computeSPFHSignatures (spfh_hist_lookup, hist_f1_, hist_f2_, hist_f3_);
-
+    );
+    
   output.is_dense = true;
   // Save a few cycles by not checking every point for NaN/Inf values if the cloud is set to dense
   if (input_->is_dense)
@@ -272,6 +275,9 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
   }
   else
   {
+    EVAL_PERFORMANCE_NO_SUP
+      ({
+	 
     // Iterate over the entire index vector
     for (size_t idx = 0; idx < indices_->size (); ++idx)
     {
@@ -297,6 +303,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
       for (int d = 0; d < fpfh_histogram_.size (); ++d)
         output.points[idx].histogram[d] = fpfh_histogram_[d];
     }
+      });
   }
 }
 
