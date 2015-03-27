@@ -44,6 +44,153 @@
 #include <pcl/features/fpfh.h>
 #include <pcl/features/pfh_tools.h>
 
+template< typename T_PointType >
+int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood( int ao_idx, std::vector<int> &ar_indices, std::vector<float> &ar_distances ) const 
+{
+  boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood = pv_buffered_neighborhood[ ao_idx ];
+  
+  if ( lp_neihborhood )
+  {
+     ar_indices = lp_neihborhood->sv_nn_indices;
+     ar_distances = lp_neihborhood->sv_nn_dists;
+     
+     return ar_indices.size();
+  }
+  else
+  {
+    ar_indices.clear();
+    ar_distances.clear();
+    
+    return 0;  
+  }
+  
+}
+
+template< typename T_PointType >
+template< typename T_NormalsType >
+void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, const pcl::PointCloud<T_NormalsType>& ar_normals, double ao_search_param  )
+{
+  size_t lo_cloud_sz = ar_cloud.width * ar_cloud.height;
+  
+  ROS_ASSERT( ar_cloud.width == ar_normals.width );
+  ROS_ASSERT( ar_cloud.height == ar_normals.height );
+  
+  typename pcl::PointCloud<T_PointType>::Ptr lp_cloud_clone;
+  EVAL_PERFORMANCE_NO_SUP (
+	{
+	  lp_cloud_clone = ar_cloud.makeShared(); // clone into the could
+	}
+    );
+  
+  
+  EVAL_PERFORMANCE_NO_SUP (
+  {
+    // set all points of the cloud clone invalid where the normals are invalid
+    // such that no index with invalid normal will be returned in the neighborhood search
+    for (size_t lo_idx = 0; lo_idx < lo_cloud_sz; lo_idx++ )
+    {
+      if ( ! pcl::isFinite( ar_normals.at( lo_idx ) ) )
+      {
+	T_PointType& lr_pt = lp_cloud_clone->at( lo_idx );
+	
+	if ( ! pcl::isFinite( lr_pt ) )
+	{
+	  lr_pt.x = nanf("");
+	  lr_pt.y = nanf("");
+	  lr_pt.z = nanf("");
+	}
+      }
+    }
+  }
+	);
+  
+  EVAL_PERFORMANCE_NO_SUP(
+      {
+  pv_buffered_neighborhood.resize( lo_cloud_sz );
+  
+  for (size_t lo_idx = 0; lo_idx < lo_cloud_sz; lo_idx++ )
+  {
+    if ( ! pcl::isFinite( ar_cloud.at( lo_idx ) ) )
+    {
+      // point invalid
+      continue;
+    }
+    
+    boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood( new pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t() );
+    
+    po_search_function( ar_cloud, lo_idx, ao_search_param, lp_neihborhood->sv_nn_indices, lp_neihborhood->sv_nn_dists );
+    
+    if ( lp_neihborhood->sv_nn_indices.size() )
+    {
+      pv_buffered_neighborhood[ lo_idx ] = lp_neihborhood;
+    }
+    // else, no neighbors found, drop this neighborhood obj
+  }
+  
+      });
+}
+
+// template< typename T_PointType >
+// template< typename T_CheckPointType/*, typename T_is_valid_check_function*/ >
+// void pcl::NeighborhoodSearchBuffer< T_PointType >::removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud  )
+// {
+//   size_t lo_cloud_sz = ar_cloud.width * ar_cloud.height;
+//   
+//   assert( lo_cloud_sz == pv_buffered_neighborhood.size() );
+//   
+//   for (size_t lo_idx = 0; lo_idx < lo_cloud_sz; lo_idx++ )
+//   {
+//     boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood = pv_buffered_neighborhood[ lo_idx ];
+//     
+//     if ( ! lp_neihborhood )
+//     {
+//       // neighborhood is yet completely invalid, nothing to be done here
+//       continue;
+//     }
+//     
+//     if ( ! pcl::isFinite( ar_cloud.at( lo_idx ) ) )
+//     {
+//       // point invalid
+//       // remove neighborhood completely
+//       pv_buffered_neighborhood[ lo_idx ].reset();
+//       continue;
+//     }
+//     
+//     // check neighborhood does not contain indices of invalid pixels
+//     std::list<int> ll_nn_indices( lp_neihborhood->sv_nn_indices.begin(),  lp_neihborhood->sv_nn_indices.end() );
+//     std::list<float> ll_nn_dists( lp_neihborhood->sv_nn_dists.begin(),  lp_neihborhood->sv_nn_dists.end() );
+//     
+//     std::list<int>::iterator lo_indices_iter( ll_nn_indices.begin() ), lo_indices_iter_end( ll_nn_indices.end() );
+//     std::list<float>::iterator lo_dists_iter( ll_nn_dists.begin() ), lo_dists_iter_end( ll_nn_dists.end() );
+//     
+//     bool lo_changed = false;
+//     
+//     while ( lo_dists_iter != lo_dists_iter_end && lo_indices_iter != lo_indices_iter_end )
+//     {
+//       if ( ! pcl::isFinite( ar_cloud.at( *lo_indices_iter ) ) )
+//       {
+// 	// invalid index, remove
+// 	lo_indices_iter = ll_nn_indices.erase( lo_indices_iter );
+// 	lo_dists_iter = ll_nn_dists.erase( lo_dists_iter );
+// 	lo_changed = true;
+//       }
+//       else
+//       {
+// 	++lo_dists_iter;
+// 	++lo_indices_iter;
+//       }
+//     }
+//     
+//     if ( lo_changed )
+//     {
+//       lp_neihborhood->sv_nn_indices = std::vector<int>( ll_nn_indices.begin(), ll_nn_indices.end() );
+//       lp_neihborhood->sv_nn_dists = std::vector<float>( ll_nn_dists.begin(), ll_nn_dists.end() );
+//     }
+//   }
+// }
+// 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointInT, typename PointNT, typename PointOutT> bool
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computePairFeatures (
@@ -190,7 +337,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
     for (size_t idx = 0; idx < indices_->size (); ++idx)
     {
       int p_idx = (*indices_)[idx];
-      if (this->searchForNeighbors (p_idx, search_parameter_, nn_indices, nn_dists) == 0)
+      if ( po_search_buffer.getNeighborhood ( p_idx, nn_indices, nn_dists) == 0)
         continue;
 
       spfh_indices.insert (nn_indices.begin (), nn_indices.end ());
@@ -218,7 +365,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
     ++spfh_indices_itr;
 
     // Find the neighborhood around p_idx
-    if (this->searchForNeighbors (*surface_, p_idx, search_parameter_, nn_indices, nn_dists) == 0)
+    if ( po_search_buffer.getNeighborhood ( p_idx, nn_indices, nn_dists) == 0 )
       continue;
 
     // Estimate the SPFH signature around p_idx
@@ -233,14 +380,29 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
 template <typename PointInT, typename PointNT, typename PointOutT> void
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut &output)
 {
+  ROS_INFO( "Conputing neighborhoods" );
+  
+  EVAL_PERFORMANCE_NO_SUP
+  (
+  po_search_buffer.fillBuffer( *input_, *normals_, search_parameter_ );
+  );
+  
+  ROS_INFO( "Tidy up neighborhoods" );
+    
+  ROS_INFO( "In pcl stuff" );
+  
   // Allocate enough space to hold the NN search results
   // \note This resize is irrelevant for a radiusSearch ().
   std::vector<int> nn_indices (k_);
   std::vector<float> nn_dists (k_);
 
   std::vector<int> spfh_hist_lookup;
+  
+  EVAL_PERFORMANCE_NO_SUP(
+      {
   computeSPFHSignatures (spfh_hist_lookup, hist_f1_, hist_f2_, hist_f3_);
-
+      });
+      
   output.is_dense = true;
   // Save a few cycles by not checking every point for NaN/Inf values if the cloud is set to dense
   if (input_->is_dense)
@@ -248,7 +410,7 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
     // Iterate over the entire index vector
     for (size_t idx = 0; idx < indices_->size (); ++idx)
     {
-      if (this->searchForNeighbors ((*indices_)[idx], search_parameter_, nn_indices, nn_dists) == 0)
+      if ( po_search_buffer.getNeighborhood ((*indices_)[idx], nn_indices, nn_dists) == 0)
       {
         for (int d = 0; d < fpfh_histogram_.size (); ++d)
           output.points[idx].histogram[d] = std::numeric_limits<float>::quiet_NaN ();
@@ -272,11 +434,14 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
   }
   else
   {
+      
+    EVAL_PERFORMANCE_NO_SUP(
+	{
     // Iterate over the entire index vector
     for (size_t idx = 0; idx < indices_->size (); ++idx)
     {
-      if (!isFinite ((*input_)[(*indices_)[idx]]) ||
-          this->searchForNeighbors ((*indices_)[idx], search_parameter_, nn_indices, nn_dists) == 0)
+      if (  /*!isFinite ((*input_)[(*indices_)[idx]]) ||*/
+          po_search_buffer.getNeighborhood ((*indices_)[idx], nn_indices, nn_dists) == 0)
       {
         for (int d = 0; d < fpfh_histogram_.size (); ++d)
           output.points[idx].histogram[d] = std::numeric_limits<float>::quiet_NaN ();
@@ -297,7 +462,10 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
       for (int d = 0; d < fpfh_histogram_.size (); ++d)
         output.points[idx].histogram[d] = fpfh_histogram_[d];
     }
+	});
   }
+  
+  po_search_buffer.clear();
 }
 
 #define PCL_INSTANTIATE_FPFHEstimation(T,NT,OutT) template class PCL_EXPORTS pcl::FPFHEstimation<T,NT,OutT>;

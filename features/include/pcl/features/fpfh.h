@@ -44,8 +44,86 @@
 #include <pcl/features/feature.h>
 #include <set>
 
+#include <boost/shared_ptr.hpp>
+#include <cmath>
+#include <list>
+
+
 namespace pcl
 {
+  template< typename T_PointType >
+  class NeighborhoodSearchBuffer
+  {
+  private:
+    typedef struct
+    {
+      std::vector<int> sv_nn_indices;
+      std::vector<float> sv_nn_dists;
+    } Neighborhood_t;
+    
+    std::vector<boost::shared_ptr<Neighborhood_t> > pv_buffered_neighborhood;
+    
+    boost::function< int (const pcl::PointCloud<T_PointType>&, size_t , double ,
+                          std::vector<int> &, std::vector<float> &) > po_search_function;
+    
+  public:
+    
+    static inline bool fastIsValid( const T_PointType& ar_pt )
+    {
+      return std::isfinite( ar_pt.x );
+    }
+    
+    static inline bool fastIsValid( const pcl::Normal& ar_pt )
+    {
+      return std::isfinite( ar_pt.normal_x );  
+    }
+    
+    NeighborhoodSearchBuffer()
+    {
+      // nothing to be done here
+    }
+    
+    virtual ~NeighborhoodSearchBuffer()
+    {
+      // nothing to be done here
+    }
+    
+    void setSearchFunction( boost::function< int (const pcl::PointCloud<T_PointType>&, size_t , double ,
+			      std::vector<int> &, std::vector<float> &) > ao_search_function )
+    {
+      po_search_function = ao_search_function;
+    }
+    
+    int getNeighborhood( int ao_idx, std::vector<int> &ar_indices, std::vector<float> &ar_distances ) const ; 
+    /*
+    template< typename T_is_valid_check_function >
+    void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, double ao_search_param );*/
+    
+    template< typename T_NormalsType >
+    void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, const pcl::PointCloud<T_NormalsType>& ar_normals, double ao_search_param  );/*
+    {
+      fillBuffer< pcl::isFinite<T_PointType> >( ar_cloud, ao_search_param );
+    }*/
+    /*
+    template< typename T_CheckPointType, typename T_is_valid_check_function  >
+    void removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud );
+    *//*
+    template< typename T_CheckPointType >
+    void removeInvalid( const pcl::PointCloud<T_CheckPointType>& ar_cloud );*//*
+    {
+      fillBuffer< T_CheckPointType,  pcl::isFinite<T_CheckPointType> >( ar_cloud  );
+    }*/
+    
+    void clear()
+    {
+      pv_buffered_neighborhood.clear();
+    }
+
+  };
+  
+  
+  
+  
   /** \brief FPFHEstimation estimates the <b>Fast Point Feature Histogram (FPFH)</b> descriptor for a given point 
     * cloud dataset containing points and normals.
     *
@@ -93,12 +171,16 @@ namespace pcl
 
       typedef typename Feature<PointInT, PointOutT>::PointCloudOut PointCloudOut;
 
+      NeighborhoodSearchBuffer<PointInT> po_search_buffer;
+      
       /** \brief Empty constructor. */
       FPFHEstimation () : 
         nr_bins_f1_ (11), nr_bins_f2_ (11), nr_bins_f3_ (11), 
         hist_f1_ (), hist_f2_ (), hist_f3_ (), fpfh_histogram_ (),
         d_pi_ (1.0f / (2.0f * static_cast<float> (M_PI)))
       {
+	po_search_buffer.setSearchFunction( boost::bind( &pcl::Feature<PointInT, PointOutT>::searchForNeighbors, this, _1, _2, _3, _4, _5 ) );
+	
         feature_name_ = "FPFHEstimation";
       };
 
