@@ -71,8 +71,8 @@ pcl::PFHEstimation<PointInT, PointNT, PointOutT, T_optimize_for_organized>::comp
       
   bool lo_return2 = pcl::computePairFeatures
 			    (
-				cloud.points[p_idx].getVector4fMap (), normals.points[p_idx].getNormalVector4fMap (),
 			        cloud.points[q_idx].getVector4fMap (), normals.points[q_idx].getNormalVector4fMap (),
+				cloud.points[p_idx].getVector4fMap (), normals.points[p_idx].getNormalVector4fMap (),
 				lo_f1, lo_f2, lo_f3, lo_f4
 			    );
     
