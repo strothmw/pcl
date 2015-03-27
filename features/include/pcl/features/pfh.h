@@ -83,7 +83,7 @@ namespace pcl
     * \ingroup features
     */
   template <typename PointInT, typename PointNT, typename PointOutT = pcl::PFHSignature125, bool T_optimize_for_organized = false>
-  class PFHEstimation : public FeatureFromNormals<PointInT, PointNT, PointOutT>
+  class PFHEstimation : public FeatureFromNormals<PointInT, PointNT, PointOutT>, public PFHPairFeaturesManagedCache<PointInT, PointNT>
   {
     public:
       typedef boost::shared_ptr<PFHEstimation<PointInT, PointNT, PointOutT> > Ptr;
@@ -107,73 +107,10 @@ namespace pcl
         nr_subdiv_ (5), 
         pfh_histogram_ (),
         pfh_tuple_ (),
-        d_pi_ (1.0f / (2.0f * static_cast<float> (M_PI))), 
-        feature_map_ (),
-        key_list_ (),
-        // Default 1GB memory size. Need to set it to something more conservative.
-        max_cache_size_ ((1ul*1024ul*1024ul*1024ul) / sizeof (std::pair<std::pair<int, int>, Eigen::Vector4f>)),
-        use_cache_ (false)
+        d_pi_ (1.0f / (2.0f * static_cast<float> (M_PI)))
       {
         feature_name_ = "PFHEstimation";
       };
-
-      /** \brief Set the maximum internal cache size. Defaults to 2GB worth of entries.
-        * \param[in] cache_size maximum cache size 
-        */
-      inline void
-      setMaximumCacheSize (unsigned int cache_size)
-      {
-        max_cache_size_ = cache_size;
-      }
-
-      /** \brief Get the maximum internal cache size. */
-      inline unsigned int 
-      getMaximumCacheSize ()
-      {
-        return (max_cache_size_);
-      }
-
-      /** \brief Set whether to use an internal cache mechanism for removing redundant calculations or not. 
-        *
-        * \note Depending on how the point cloud is ordered and how the nearest
-        * neighbors are estimated, using a cache could have a positive or a
-        * negative influence. Please test with and without a cache on your
-        * data, and choose whatever works best!
-        *
-        * See \ref setMaximumCacheSize for setting the maximum cache size
-        *
-        * \param[in] use_cache set to true to use the internal cache, false otherwise
-        */
-      inline void
-      setUseInternalCache (bool use_cache)
-      {
-        use_cache_ = use_cache;
-      }
-
-      /** \brief Get whether the internal cache is used or not for computing the PFH features. */
-      inline bool
-      getUseInternalCache ()
-      {
-        return (use_cache_);
-      }
-
-      /** \brief Compute the 4-tuple representation containing the three angles and one distance between two points
-        * represented by Cartesian coordinates and normals.
-        * \note For explanations about the features, please see the literature mentioned above (the order of the
-        * features might be different).
-        * \param[in] cloud the dataset containing the XYZ Cartesian coordinates of the two points
-        * \param[in] normals the dataset containing the surface normals (assuming normalized vectors) at each point in cloud
-        * \param[in] p_idx the index of the first point (source)
-        * \param[in] q_idx the index of the second point (target)
-        * \param[out] f1 the first angular feature (angle between the projection of nq_idx and u)
-        * \param[out] f2 the second angular feature (angle between nq_idx and v)
-        * \param[out] f3 the third angular feature (angle between np_idx and |p_idx - q_idx|)
-        * \param[out] f4 the distance feature (p_idx - q_idx)
-        * \note For efficiency reasons, we assume that the point data passed to the method is finite.
-        */
-      bool 
-      computePairFeatures (const pcl::PointCloud<PointInT> &cloud, const pcl::PointCloud<PointNT> &normals, 
-                           int p_idx, int q_idx, float &f1, float &f2, float &f3, float &f4);
 
       /** \brief Estimate the PFH (Point Feature Histograms) individual signatures of the three angular (f1, f2, f3)
         * features for a given point based on its spatial neighborhood of 3D points with normals
@@ -210,24 +147,6 @@ namespace pcl
 
       /** \brief Float constant = 1.0 / (2.0 * M_PI) */
       float d_pi_; 
-
-      /** \brief Internal hashmap, used to optimize efficiency of redundant computations. */
-      std::unordered_map< 
-		  uint64_t, 
-		  Eigen::Vector4f, 
-		  std::hash< uint64_t >, 
-		  std::equal_to< uint64_t >, 
-		  Eigen::aligned_allocator<Eigen::Vector4f> 
-		  > feature_map_;
-      
-      /** \brief Queue of pairs saved, used to constrain memory usage. */
-      std::queue<uint64_t> key_list_;
-
-      /** \brief Maximum size of internal cache memory. */
-      unsigned int max_cache_size_;
-
-      /** \brief Set to true to use the internal cache for removing redundant computations. */
-      bool use_cache_;
   };
 }
 
