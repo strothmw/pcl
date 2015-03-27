@@ -131,13 +131,6 @@ namespace pcl
 	{
 	  clearCache();
 	  pv_feature_maps.resize( ao_length );
-	  
-	  std::vector< IdFeatureMapType >::iterator lo_iter( pv_feature_maps.begin() ), lo_iter_end( pv_feature_maps.end() );
-	  
-	  for ( ; lo_iter != lo_iter_end ; ++lo_iter )
-	  {
-	    *lo_iter = IdFeatureMapType( new std::vector< FeatureMapObj >() );
-	  }
 	}
       }
       
@@ -203,17 +196,9 @@ namespace pcl
       
   private:
     
-      class FeatureMapObj
-      {
-      public:
-	Eigen::Vector4f first;
-	bool second;
-	bool computed;
-	
-	FeatureMapObj() : computed( false ) {};
-      } ;
-            
-      typedef boost::shared_ptr< std::vector< FeatureMapObj > > IdFeatureMapType;
+      typedef std::pair<Eigen::Vector4f, bool> FeatureMapObj;
+      
+      typedef std::map< int, FeatureMapObj > IdFeatureMapType;
       
       std::vector< IdFeatureMapType > pv_feature_maps;
     

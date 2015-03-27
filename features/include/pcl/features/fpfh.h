@@ -42,12 +42,14 @@
 #define PCL_FPFH_H_
 
 #include <pcl/features/feature.h>
+#include <pcl/features/pfh_tools.h>
 #include <set>
 
 #include <boost/shared_ptr.hpp>
 #include <cmath>
 #include <math.h>
 #include <list>
+
 
 
 namespace pcl
@@ -133,7 +135,7 @@ namespace pcl
     * \ingroup features
     */
   template <typename PointInT, typename PointNT, typename PointOutT = pcl::FPFHSignature33>
-  class FPFHEstimation : public FeatureFromNormals<PointInT, PointNT, PointOutT>
+  class FPFHEstimation : public FeatureFromNormals<PointInT, PointNT, PointOutT>, public pcl::PFHPairFeaturesManagedCache<PointInT, PointNT>
   {
     public:
       typedef boost::shared_ptr<FPFHEstimation<PointInT, PointNT, PointOutT> > Ptr;
@@ -166,23 +168,6 @@ namespace pcl
 	
         feature_name_ = "FPFHEstimation";
       };
-
-      /** \brief Compute the 4-tuple representation containing the three angles and one distance between two points
-        * represented by Cartesian coordinates and normals.
-        * \note For explanations about the features, please see the literature mentioned above (the order of the
-        * features might be different).
-        * \param[in] cloud the dataset containing the XYZ Cartesian coordinates of the two points
-        * \param[in] normals the dataset containing the surface normals (assuming normalized vectors) at each point in cloud
-        * \param[in] p_idx the index of the first point (source)
-        * \param[in] q_idx the index of the second point (target)
-        * \param[out] f1 the first angular feature (angle between the projection of nq_idx and u)
-        * \param[out] f2 the second angular feature (angle between nq_idx and v)
-        * \param[out] f3 the third angular feature (angle between np_idx and |p_idx - q_idx|)
-        * \param[out] f4 the distance feature (p_idx - q_idx)
-        */
-      bool 
-      computePairFeatures (const pcl::PointCloud<PointInT> &cloud, const pcl::PointCloud<PointNT> &normals, 
-                           int p_idx, int q_idx, float &f1, float &f2, float &f3, float &f4);
 
       /** \brief Estimate the SPFH (Simple Point Feature Histograms) individual signatures of the three angular
         * (f1, f2, f3) features for a given point based on its spatial neighborhood of 3D points with normals

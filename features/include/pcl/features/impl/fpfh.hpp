@@ -132,18 +132,6 @@ void pcl::NeighborhoodSearchBuffer< T_PointType >::fillBuffer
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointInT, typename PointNT, typename PointOutT> bool
-pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computePairFeatures (
-    const pcl::PointCloud<PointInT> &cloud, const pcl::PointCloud<PointNT> &normals,
-    int p_idx, int q_idx, float &f1, float &f2, float &f3, float &f4)
-{
-  pcl::computePairFeatures (cloud.points[p_idx].getVector4fMap (), normals.points[p_idx].getNormalVector4fMap (),
-      cloud.points[q_idx].getVector4fMap (), normals.points[q_idx].getNormalVector4fMap (),
-      f1, f2, f3, f4);
-  return (true);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointInT, typename PointNT, typename PointOutT> void 
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computePointSPFHSignature (
     const pcl::PointCloud<PointInT> &cloud, const pcl::PointCloud<PointNT> &normals,
@@ -166,9 +154,8 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computePointSPFHSignature (
     if (p_idx == indices[idx])
         continue;
 
-    // Compute the pair P to NNi
-    if (!computePairFeatures (cloud, normals, p_idx, indices[idx], pfh_tuple[0], pfh_tuple[1], pfh_tuple[2], pfh_tuple[3]))
-        continue;
+    if ( !PFHPairFeaturesManagedCache<PointInT, PointNT>::getPairFeatures( cloud, normals, p_idx, indices[idx], pfh_tuple ) )
+      continue;
 
     // Normalize the f1, f2, f3 features and push them in the histogram
     int h_index = static_cast<int> (floor (nr_bins_f1 * ((pfh_tuple[0] + M_PI) * d_pi_)));
@@ -318,6 +305,8 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
 template <typename PointInT, typename PointNT, typename PointOutT> void
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut &output)
 {
+  PFHPairFeaturesManagedCache<PointInT, PointNT>::initCache( indices_->size () );
+    
   po_search_buffer.fillBuffer( *input_, *normals_, search_parameter_ );
   
   std::vector<int> spfh_hist_lookup;
@@ -366,6 +355,8 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
   }
   
   po_search_buffer.clear();
+  
+  PFHPairFeaturesManagedCache<PointInT, PointNT>::clearCache();
 }
 
 #define PCL_INSTANTIATE_FPFHEstimation(T,NT,OutT) template class PCL_EXPORTS pcl::FPFHEstimation<T,NT,OutT>;
