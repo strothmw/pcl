@@ -45,21 +45,19 @@
 #include <pcl/features/pfh_tools.h>
 
 template< typename T_PointType >
-int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood( int ao_idx, std::vector<int> &ar_indices, std::vector<float> &ar_distances ) const 
+int pcl::NeighborhoodSearchBuffer< T_PointType >::getNeighborhood( int ao_idx, NeighborhoodConstPtr& ap_neighborhood  ) const 
 {
-  boost::shared_ptr< pcl::NeighborhoodSearchBuffer< T_PointType >::Neighborhood_t > lp_neihborhood = pv_buffered_neighborhood[ ao_idx ];
+  NeighborhoodPtr lp_neihborhood = pv_buffered_neighborhood[ ao_idx ];
   
   if ( lp_neihborhood )
   {
-     ar_indices = lp_neihborhood->sv_nn_indices;
-     ar_distances = lp_neihborhood->sv_nn_dists;
+     ap_neighborhood = lp_neihborhood;
      
-     return ar_indices.size();
+     return lp_neihborhood->sv_nn_indices.size();
   }
   else
   {
-    ar_indices.clear();
-    ar_distances.clear();
+    ap_neighborhood.reset();
     
     return 0;  
   }
@@ -321,11 +319,9 @@ template <typename PointInT, typename PointNT, typename PointOutT> void
 pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::vector<int> &spfh_hist_lookup,
     Eigen::MatrixXf &hist_f1, Eigen::MatrixXf &hist_f2, Eigen::MatrixXf &hist_f3)
 {
-  // Allocate enough space to hold the NN search results
-  // \note This resize is irrelevant for a radiusSearch ().
-  std::vector<int> nn_indices (k_);
-  std::vector<float> nn_dists (k_);
-
+  // use pointers to avoid having to copy the vectors each time calling into getNeighborhood
+  typename pcl::NeighborhoodSearchBuffer<PointInT>::NeighborhoodConstPtr lp_neihborhood;
+  
   std::set<int> spfh_indices;
   spfh_hist_lookup.resize (surface_->points.size ());
 
@@ -337,10 +333,10 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
     for (size_t idx = 0; idx < indices_->size (); ++idx)
     {
       int p_idx = (*indices_)[idx];
-      if ( po_search_buffer.getNeighborhood ( p_idx, nn_indices, nn_dists) == 0)
+      if ( po_search_buffer.getNeighborhood ( p_idx, lp_neihborhood ) == 0)
         continue;
 
-      spfh_indices.insert (nn_indices.begin (), nn_indices.end ());
+      spfh_indices.insert ( lp_neihborhood->sv_nn_indices.begin (), lp_neihborhood->sv_nn_indices.end ());
     }
   }
   else
@@ -365,11 +361,11 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeSPFHSignatures (std::v
     ++spfh_indices_itr;
 
     // Find the neighborhood around p_idx
-    if ( po_search_buffer.getNeighborhood ( p_idx, nn_indices, nn_dists) == 0 )
+    if ( po_search_buffer.getNeighborhood ( p_idx, lp_neihborhood ) == 0 )
       continue;
 
     // Estimate the SPFH signature around p_idx
-    computePointSPFHSignature (*surface_, *normals_, p_idx, i, nn_indices, hist_f1, hist_f2, hist_f3);
+    computePointSPFHSignature (*surface_, *normals_, p_idx, i, lp_neihborhood->sv_nn_indices, hist_f1, hist_f2, hist_f3);
 
     // Populate a lookup table for converting a point index to its corresponding row in the spfh_hist_* matrices
     spfh_hist_lookup[p_idx] = i;
@@ -391,11 +387,6 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
     
   ROS_INFO( "In pcl stuff" );
   
-  // Allocate enough space to hold the NN search results
-  // \note This resize is irrelevant for a radiusSearch ().
-  std::vector<int> nn_indices (k_);
-  std::vector<float> nn_dists (k_);
-
   std::vector<int> spfh_hist_lookup;
   
   EVAL_PERFORMANCE_NO_SUP(
@@ -404,67 +395,47 @@ pcl::FPFHEstimation<PointInT, PointNT, PointOutT>::computeFeature (PointCloudOut
       });
       
   output.is_dense = true;
-  // Save a few cycles by not checking every point for NaN/Inf values if the cloud is set to dense
-  if (input_->is_dense)
-  {
-    // Iterate over the entire index vector
-    for (size_t idx = 0; idx < indices_->size (); ++idx)
-    {
-      if ( po_search_buffer.getNeighborhood ((*indices_)[idx], nn_indices, nn_dists) == 0)
-      {
-        for (int d = 0; d < fpfh_histogram_.size (); ++d)
-          output.points[idx].histogram[d] = std::numeric_limits<float>::quiet_NaN ();
-    
-        output.is_dense = false;
-        continue;
-      }
-
-      // ... and remap the nn_indices values so that they represent row indices in the spfh_hist_* matrices 
-      // instead of indices into surface_->points
-      for (size_t i = 0; i < nn_indices.size (); ++i)
-        nn_indices[i] = spfh_hist_lookup[nn_indices[i]];
-
-      // Compute the FPFH signature (i.e. compute a weighted combination of local SPFH signatures) ...
-      weightPointSPFHSignature (hist_f1_, hist_f2_, hist_f3_, nn_indices, nn_dists, fpfh_histogram_);
-
-      // ...and copy it into the output cloud
-      for (int d = 0; d < fpfh_histogram_.size (); ++d)
-        output.points[idx].histogram[d] = fpfh_histogram_[d];
-    }
-  }
-  else
-  {
       
-    EVAL_PERFORMANCE_NO_SUP(
-	{
-    // Iterate over the entire index vector
-    for (size_t idx = 0; idx < indices_->size (); ++idx)
-    {
-      if (  /*!isFinite ((*input_)[(*indices_)[idx]]) ||*/
-          po_search_buffer.getNeighborhood ((*indices_)[idx], nn_indices, nn_dists) == 0)
+  EVAL_PERFORMANCE_NO_SUP(
       {
-        for (int d = 0; d < fpfh_histogram_.size (); ++d)
-          output.points[idx].histogram[d] = std::numeric_limits<float>::quiet_NaN ();
-    
-        output.is_dense = false;
-        continue;
-      }
-
-      // ... and remap the nn_indices values so that they represent row indices in the spfh_hist_* matrices 
-      // instead of indices into surface_->points
-      for (size_t i = 0; i < nn_indices.size (); ++i)
-        nn_indices[i] = spfh_hist_lookup[nn_indices[i]];
-
-      // Compute the FPFH signature (i.e. compute a weighted combination of local SPFH signatures) ...
-      weightPointSPFHSignature (hist_f1_, hist_f2_, hist_f3_, nn_indices, nn_dists, fpfh_histogram_);
-
-      // ...and copy it into the output cloud
-      for (int d = 0; d < fpfh_histogram_.size (); ++d)
-        output.points[idx].histogram[d] = fpfh_histogram_[d];
-    }
-	});
-  }
+	
+  typename pcl::NeighborhoodSearchBuffer<PointInT>::NeighborhoodConstPtr lp_neihborhood;
   
+  // Iterate over the entire index vector
+  for (size_t idx = 0; idx < indices_->size (); ++idx)
+  {
+    if ( po_search_buffer.getNeighborhood ((*indices_)[idx], lp_neihborhood ) == 0)
+    {
+      for (int d = 0; d < fpfh_histogram_.size (); ++d)
+      {
+	output.points[idx].histogram[d] = std::numeric_limits<float>::quiet_NaN ();
+      }
+  
+      output.is_dense = false;
+      continue;
+    }
+    
+    std::vector<int> lv_nn_indices;
+    lv_nn_indices.resize( lp_neihborhood->sv_nn_indices.size() );
+
+    // ... and remap the nn_indices values so that they represent row indices in the spfh_hist_* matrices 
+    // instead of indices into surface_->points
+    for (size_t i = 0; i < lv_nn_indices.size (); ++i)
+    {
+      lv_nn_indices[i] = spfh_hist_lookup[lp_neihborhood->sv_nn_indices[i]];
+    }
+
+    // Compute the FPFH signature (i.e. compute a weighted combination of local SPFH signatures) ...
+    weightPointSPFHSignature (hist_f1_, hist_f2_, hist_f3_, lv_nn_indices, lp_neihborhood->sv_nn_dists, fpfh_histogram_);
+
+    // ...and copy it into the output cloud
+    for (int d = 0; d < fpfh_histogram_.size (); ++d)
+    {
+      output.points[idx].histogram[d] = fpfh_histogram_[d];
+    }
+  }
+      });
+
   po_search_buffer.clear();
 }
 

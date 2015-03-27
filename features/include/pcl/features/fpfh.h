@@ -54,13 +54,17 @@ namespace pcl
   template< typename T_PointType >
   class NeighborhoodSearchBuffer
   {
-  private:
+  public:
     typedef struct
     {
       std::vector<int> sv_nn_indices;
       std::vector<float> sv_nn_dists;
     } Neighborhood_t;
+   
+    typedef boost::shared_ptr<Neighborhood_t> NeighborhoodPtr;
+    typedef boost::shared_ptr<const Neighborhood_t> NeighborhoodConstPtr;
     
+  private: 
     std::vector<boost::shared_ptr<Neighborhood_t> > pv_buffered_neighborhood;
     
     boost::function< int (const pcl::PointCloud<T_PointType>&, size_t , double ,
@@ -94,7 +98,7 @@ namespace pcl
       po_search_function = ao_search_function;
     }
     
-    int getNeighborhood( int ao_idx, std::vector<int> &ar_indices, std::vector<float> &ar_distances ) const ; 
+    int getNeighborhood( int ao_idx, NeighborhoodConstPtr& ap_neighborhood ) const ; 
     /*
     template< typename T_is_valid_check_function >
     void fillBuffer( const pcl::PointCloud<T_PointType>& ar_cloud, double ao_search_param );*/
