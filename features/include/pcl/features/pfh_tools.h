@@ -46,6 +46,7 @@
 #include <Eigen/Core>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/concept_check.hpp>
 
 #include <map>
 #include <vector>
@@ -195,8 +196,18 @@ namespace pcl
       }
       
   private:
+      
+      class FeatureMapObj
+      {
+      public:
+	Eigen::Vector4f first;
+	bool second;
+	bool filled;
+	
+	FeatureMapObj() : filled( false ) {}
+      };
     
-      typedef std::pair<Eigen::Vector4f, bool> FeatureMapObj;
+      //typedef std::pair<Eigen::Vector4f, bool> FeatureMapObj;
       
       typedef std::map< int, FeatureMapObj > IdFeatureMapType;
       
