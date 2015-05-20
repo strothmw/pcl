@@ -75,8 +75,8 @@ bool pcl::PFHPairFeaturesManagedCache< PointInT, PointNT >::getPairFeatures
 {
   bool lo_return;
   
-   static int lo_found_sum;
-   static int lo_not_found_sum;
+   //static int lo_found_sum;
+   //static int lo_not_found_sum;
   
   if (use_cache_)
   {
@@ -95,30 +95,22 @@ bool pcl::PFHPairFeaturesManagedCache< PointInT, PointNT >::getPairFeatures
       q_idx = lo_p2_swap;
     }
     
-   ROS_ASSERT( q_idx < p_idx );
+ //   ROS_ASSERT( q_idx < p_idx );
     
-    IdFeatureMapType& lr_id_map = pv_feature_maps[ p_idx ];
+    IdFeatureMapType& lr_feature_map = pv_feature_maps[ p_idx ];
+        
+    FeatureMapObj& lr_id_map_obj = lr_feature_map[ q_idx ];
     
-    std::pair<IdFeatureMapType::iterator, bool> lo_insert_return;
-    
+    if ( lr_id_map_obj.filled )
     {
-      // a "pseudo" feature map obj to test if it can be inserted to the map
-      // if it can be inserted the value is not yet cached and must be
-      // calculated
-      std::pair<int, FeatureMapObj> lo_pair;
-      lo_pair.first = q_idx;
+   //    lo_found_sum++;
       
-      lo_insert_return = lr_id_map.insert( lo_pair );
+      ar_pfh_tuple = lr_id_map_obj.first;
+      lo_return = lr_id_map_obj.second;
     }
-    
-    if ( lo_insert_return.second )
+    else
     {
-   lo_not_found_sum++;
-      
-      // inserting into feature map succeeded
-      // the "pseudo" value was inserted
-      //   i. e. it was not found in the cache
-      // we have to calculate it and return the newly calculated value
+ //      lo_not_found_sum++;
       
       lo_return = computePairFeatures
 			( 	
@@ -126,25 +118,10 @@ bool pcl::PFHPairFeaturesManagedCache< PointInT, PointNT >::getPairFeatures
 			    ar_pfh_tuple[0], ar_pfh_tuple[1], ar_pfh_tuple[2], ar_pfh_tuple[3] 
 			);
 			
-      // and assign the newly calculated value to the returned iterator, thereby 
-      // "really" filling the inserted field
-			
-      lo_insert_return.first->second.first = ar_pfh_tuple;
-      lo_insert_return.first->second.second = lo_return;
-    }
-    else
-    {
-      lo_found_sum++;
-      
-      // inserting into feature map did not succeed
-      // the "pseudo" value was not inserted
-      //   i. e. a value for the key it was not found in the cache
-      //   the value found the the cache is pointed by the returned iterator
-      // we have to return the value pointed by the iterator
-      
-      ar_pfh_tuple = lo_insert_return.first->second.first ;
-      lo_return = lo_insert_return.first->second.second ;
-   	
+      lr_id_map_obj.first = ar_pfh_tuple;
+      lr_id_map_obj.second = lo_return;
+      lr_id_map_obj.filled = true;
+
        // Use a maximum cache so that we don't go overboard on RAM usage
 //       key_list_.push (lo_key);
 //       // Check to see if we need to remove an element due to exceeding max_size
@@ -165,8 +142,8 @@ bool pcl::PFHPairFeaturesManagedCache< PointInT, PointNT >::getPairFeatures
 		      );
   }
   
-  ROS_INFO_STREAM_THROTTLE( 0.25, "Calls: " << lo_found_sum + lo_not_found_sum );
-  ROS_INFO_STREAM_THROTTLE( 0.25, "Found ratio: " << static_cast<double>( lo_found_sum ) / (static_cast<double>( lo_found_sum ) + lo_not_found_sum ) );
+//  ROS_INFO_STREAM_THROTTLE( 0.25, "Calls: " << lo_found_sum + lo_not_found_sum );
+//   ROS_INFO_STREAM_THROTTLE( 0.25, "Found ratio: " << static_cast<double>( lo_found_sum ) / (static_cast<double>( lo_found_sum ) + lo_not_found_sum ) );
   // ROS_INFO_STREAM_THROTTLE( 2.5, "Cache size: " << key_list_.size() );
   // ROS_INFO_STREAM_THROTTLE( 2.5, "Max cache size: " << max_cache_size_ );
    
