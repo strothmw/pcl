@@ -314,6 +314,11 @@ namespace pcl
         }
       }
       
+	/**
+	 * WS: added for checking the PCL version is my own rebuild
+	 */
+      static bool isRebuild() { return true; }
+      
     protected:
 
       /** \brief Computes the normal for the complete cloud or only \a indices_ if provided.

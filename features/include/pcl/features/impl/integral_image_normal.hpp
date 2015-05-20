@@ -758,7 +758,7 @@ pcl::IntegralImageNormalEstimation<PointInT, PointOutT>::computeFeature (PointCl
       }
     }
   }
-
+    
   // compute distance map
   //float *distanceMap = new float[input_->points.size ()];
   if (distance_map_ != NULL) delete[] distance_map_;
@@ -766,12 +766,14 @@ pcl::IntegralImageNormalEstimation<PointInT, PointOutT>::computeFeature (PointCl
   float *distanceMap = distance_map_;
   for (size_t index = 0; index < input_->points.size (); ++index)
   {
-    if (depthChangeMap[index] == 0)
-      distanceMap[index] = 0.0f;
-    else
+//     if (depthChangeMap[index] == 0)
+//       distanceMap[index] = 0.0f;
+//     else
       distanceMap[index] = static_cast<float> (input_->width + input_->height);
   }
 
+  
+  /*
   // first pass
   float* previous_row = distanceMap;
   float* current_row = previous_row + input_->width;
@@ -815,7 +817,8 @@ pcl::IntegralImageNormalEstimation<PointInT, PointOutT>::computeFeature (PointCl
     next_row = current_row;
     current_row -= input_->width;
   }
-
+  */
+  
   if (indices_->size () < input_->size ())
     computeFeaturePart (distanceMap, bad_point, output);
   else
