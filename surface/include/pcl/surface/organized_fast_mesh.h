@@ -105,6 +105,8 @@ namespace pcl
 
       /** \brief Destructor. */
       virtual ~OrganizedFastMesh () {};
+      
+      inline static bool isRebuild(){return true;};
 
       /** \brief Set a maximum edge length. 
         * Using not only the scalar \a a, but also \a b and \a c, allows for using a distance threshold in the form of:
@@ -351,50 +353,57 @@ namespace pcl
         * \param[in] point_b the second point
         */
       inline bool
-      isShadowed (const PointInT& point_a, const PointInT& point_b)
+      isNotShadowedAndNotExceedingDistThresh (const PointInT& point_a, const PointInT& point_b)
       {
         bool valid = true;
+	
+	if ( !store_shadowed_faces_ || max_edge_length_set_ )
+	{
+	  Eigen::Vector3f dir_a = viewpoint_ - point_a.getVector3fMap ();
+	  Eigen::Vector3f dir_b = point_b.getVector3fMap () - point_a.getVector3fMap ();
+	  float distance_to_points = dir_a.norm ();
+	  float distance_between_points = dir_b.norm ();
+	  
+	  if (!store_shadowed_faces_)
+	  {
 
-        Eigen::Vector3f dir_a = viewpoint_ - point_a.getVector3fMap ();
-        Eigen::Vector3f dir_b = point_b.getVector3fMap () - point_a.getVector3fMap ();
-        float distance_to_points = dir_a.norm ();
-        float distance_between_points = dir_b.norm ();
+	    if (cos_angle_tolerance_ > 0)
+	    {
+	      float cos_angle = dir_a.dot (dir_b) / (distance_to_points*distance_between_points);
+	      if (cos_angle != cos_angle)
+		cos_angle = 1.0f;
+	      bool check_angle = fabs (cos_angle) >= cos_angle_tolerance_;
 
-        if (cos_angle_tolerance_ > 0)
-        {
-          float cos_angle = dir_a.dot (dir_b) / (distance_to_points*distance_between_points);
-          if (cos_angle != cos_angle)
-            cos_angle = 1.0f;
-          bool check_angle = fabs (cos_angle) >= cos_angle_tolerance_;
+	      bool check_distance = true;
+	      if (check_angle && (distance_tolerance_ > 0))
+	      {
+		float dist_thresh = distance_tolerance_;
+		if (distance_dependent_)
+		{
+		  float d = distance_to_points;
+		  if (use_depth_as_distance_)
+		    d = std::max(point_a.z, point_b.z);
+		  dist_thresh *= d*d;
+		  dist_thresh *= dist_thresh;  // distance_tolerance_ is already squared if distance_dependent_ is false.
+		}
+		check_distance = (distance_between_points > dist_thresh);
+	      }
+	      valid = !(check_angle && check_distance);
+	    }
+	  }
 
-          bool check_distance = true;
-          if (check_angle && (distance_tolerance_ > 0))
-          {
-            float dist_thresh = distance_tolerance_;
-            if (distance_dependent_)
-            {
-              float d = distance_to_points;
-              if (use_depth_as_distance_)
-                d = std::max(point_a.z, point_b.z);
-              dist_thresh *= d*d;
-              dist_thresh *= dist_thresh;  // distance_tolerance_ is already squared if distance_dependent_ is false.
-            }
-            check_distance = (distance_between_points > dist_thresh);
-          }
-          valid = !(check_angle && check_distance);
-        }
-
-        // check if max. edge length is not exceeded
-        if (max_edge_length_set_)
-        {
-          float dist = (use_depth_as_distance_ ? std::max(point_a.z, point_b.z) : distance_to_points);
-          float dist_thresh = max_edge_length_a_;
-          if (fabs(max_edge_length_b_) > std::numeric_limits<float>::min())
-            dist_thresh += max_edge_length_b_ * dist;
-          if (fabs(max_edge_length_c_) > std::numeric_limits<float>::min())
-            dist_thresh += max_edge_length_c_ * dist * dist;
-          valid = (distance_between_points <= dist_thresh);
-        }
+	  // check if max. edge length is not exceeded
+	  if (max_edge_length_set_)
+	  {
+	    float dist = (use_depth_as_distance_ ? std::max(point_a.z, point_b.z) : distance_to_points);
+	    float dist_thresh = max_edge_length_a_;
+	    if (fabs(max_edge_length_b_) > std::numeric_limits<float>::min())
+	      dist_thresh += max_edge_length_b_ * dist;
+	    if (fabs(max_edge_length_c_) > std::numeric_limits<float>::min())
+	      dist_thresh += max_edge_length_c_ * dist * dist;
+	    valid = (distance_between_points <= dist_thresh);
+	  }
+	}
 
         return !valid;
       }
@@ -419,12 +428,12 @@ namespace pcl
         * \param[in] c index of the third vertex
         */
       inline bool
-      isShadowedTriangle (const int& a, const int& b, const int& c)
+      isNotShadowedAndNotExceedingDistThreshTriangle (const int& a, const int& b, const int& c)
       {
-        if (isShadowed (input_->points[a], input_->points[b])) return (true);
-        if (isShadowed (input_->points[b], input_->points[c])) return (true);
-        if (isShadowed (input_->points[c], input_->points[a])) return (true);
-        return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[a], input_->points[b])) return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[b], input_->points[c])) return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[c], input_->points[a])) return (false);
+        return (true);
       }
 
       /** \brief Check if a quad is valid.
@@ -450,13 +459,13 @@ namespace pcl
         * \param[in] d index of the fourth vertex
         */
       inline bool
-      isShadowedQuad (const int& a, const int& b, const int& c, const int& d)
+      isNotShadowedAndNotExceedingDistThreshQuad (const int& a, const int& b, const int& c, const int& d)
       {
-        if (isShadowed (input_->points[a], input_->points[b])) return (true);
-        if (isShadowed (input_->points[b], input_->points[c])) return (true);
-        if (isShadowed (input_->points[c], input_->points[d])) return (true);
-        if (isShadowed (input_->points[d], input_->points[a])) return (true);
-        return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[a], input_->points[b])) return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[b], input_->points[c])) return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[c], input_->points[d])) return (false);
+        if (isNotShadowedAndNotExceedingDistThresh (input_->points[d], input_->points[a])) return (false);
+        return (true);
       }
 
       /** \brief Create a quad mesh.
